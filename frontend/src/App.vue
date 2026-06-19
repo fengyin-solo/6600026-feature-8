@@ -11,6 +11,10 @@ const gcWindowSize = ref(50);
 const newSeqName = ref('');
 const newSeqData = ref('');
 const isBuildingTree = ref(false);
+const showDeleteConfirm = ref(false);
+const pendingDeleteId = ref('');
+const pendingDeleteName = ref('');
+const pendingDeleteImpacts = ref<string[]>([]);
 
 onMounted(() => {
   store.loadMockSequences();
@@ -56,6 +60,33 @@ function handleAddSequence() {
 function handleLoadMock() {
   store.loadMockSequences();
   gcSeqId.value = store.sequences[0]?.id || '';
+}
+
+function handleDeleteClick(seqId: string) {
+  const seq = store.sequences.find(s => s.id === seqId);
+  if (!seq) return;
+  pendingDeleteId.value = seqId;
+  pendingDeleteName.value = seq.name;
+  pendingDeleteImpacts.value = store.getDeletionImpacts(seqId);
+  showDeleteConfirm.value = true;
+}
+
+function handleConfirmDelete() {
+  store.removeSequence(pendingDeleteId.value);
+  if (gcSeqId.value === pendingDeleteId.value) {
+    gcSeqId.value = store.sequences[0]?.id || '';
+  }
+  showDeleteConfirm.value = false;
+  pendingDeleteId.value = '';
+  pendingDeleteName.value = '';
+  pendingDeleteImpacts.value = [];
+}
+
+function handleCancelDelete() {
+  showDeleteConfirm.value = false;
+  pendingDeleteId.value = '';
+  pendingDeleteName.value = '';
+  pendingDeleteImpacts.value = [];
 }
 </script>
 
@@ -129,7 +160,7 @@ function handleLoadMock() {
                 <td class="px-4 py-1.5 text-gray-400">{{ seq.data.length }} bp</td>
                 <td class="px-4 py-1.5">
                   <button
-                    @click="store.removeSequence(seq.id)"
+                    @click="handleDeleteClick(seq.id)"
                     class="text-red-400 hover:text-red-300 text-xs"
                   >
                     删除
@@ -266,6 +297,52 @@ function handleLoadMock() {
           <PhyloTree :tree="store.phyloTree" />
         </div>
       </section>
+    </div>
+
+    <div
+      v-if="showDeleteConfirm"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      @click.self="handleCancelDelete"
+    >
+      <div class="bg-gray-800 border border-gray-700 rounded-lg shadow-xl w-96 overflow-hidden">
+        <div class="px-4 py-3 bg-red-900/30 border-b border-red-800/50 flex items-center gap-2">
+          <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <h3 class="text-sm font-semibold text-red-300">确认删除序列</h3>
+        </div>
+        <div class="p-4 space-y-3">
+          <p class="text-sm text-gray-200">
+            确定要删除序列 <span class="text-cyan-400 font-mono">"{{ pendingDeleteName }}"</span> 吗？
+          </p>
+          <div v-if="pendingDeleteImpacts.length > 0" class="bg-yellow-900/20 border border-yellow-700/50 rounded p-3">
+            <p class="text-xs font-semibold text-yellow-400 mb-2">⚠ 此操作将清除以下分析结果：</p>
+            <ul class="text-xs text-yellow-300 space-y-1 list-disc list-inside">
+              <li v-for="impact in pendingDeleteImpacts" :key="impact">{{ impact }}</li>
+            </ul>
+          </div>
+          <p v-else class="text-xs text-gray-400">
+            当前没有关联的分析结果。
+          </p>
+          <p class="text-xs text-gray-500">
+            删除后不可恢复，请谨慎操作。
+          </p>
+        </div>
+        <div class="px-4 py-3 bg-gray-900/50 border-t border-gray-700 flex justify-end gap-2">
+          <button
+            @click="handleCancelDelete"
+            class="px-4 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-sm rounded transition-colors"
+          >
+            取消
+          </button>
+          <button
+            @click="handleConfirmDelete"
+            class="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm rounded transition-colors"
+          >
+            确认删除
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
