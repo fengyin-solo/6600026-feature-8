@@ -18,6 +18,9 @@ export const useSequenceStore = defineStore('sequence', () => {
   const phyloTree = ref<PhyloNode | null>(null);
   const selectedSeq1 = ref<string>('');
   const selectedSeq2 = ref<string>('');
+  const alignmentSeq1Id = ref<string>('');
+  const alignmentSeq2Id = ref<string>('');
+  const gcAnalyzedSeqId = ref<string>('');
 
   const alignmentIdentity = computed(() => {
     return alignmentResult.value ? alignmentResult.value.identity : 0;
@@ -36,22 +39,31 @@ export const useSequenceStore = defineStore('sequence', () => {
     });
   }
 
+  function isAlignmentAffected(id: string) {
+    return !!alignmentResult.value && (alignmentSeq1Id.value === id || alignmentSeq2Id.value === id);
+  }
+
+  function isGcAffected(id: string) {
+    return gcData.value.length > 0 && gcAnalyzedSeqId.value === id;
+  }
+
+  function isTreeAffected() {
+    return !!phyloTree.value;
+  }
+
   function getDeletionImpacts(id: string) {
     const impacts: string[] = [];
     const seq = sequences.value.find(s => s.id === id);
     if (!seq) return impacts;
 
-    if (selectedSeq1.value === id || selectedSeq2.value === id) {
-      impacts.push('当前比对选择的序列');
-    }
-    if (alignmentResult.value && (selectedSeq1.value === id || selectedSeq2.value === id)) {
+    if (isAlignmentAffected(id)) {
       impacts.push('已有的序列比对结果');
     }
-    if (gcData.value.length > 0) {
+    if (isGcAffected(id)) {
       impacts.push('GC含量分析结果');
     }
-    if (phyloTree.value) {
-      impacts.push('系统发育树结果');
+    if (isTreeAffected()) {
+      impacts.push('系统发育树结果（基于全部序列，删除任一序列将失效）');
     }
     return impacts;
   }
@@ -65,13 +77,16 @@ export const useSequenceStore = defineStore('sequence', () => {
     if (selectedSeq1.value === id) selectedSeq1.value = '';
     if (selectedSeq2.value === id) selectedSeq2.value = '';
 
-    if (alignmentResult.value) {
+    if (isAlignmentAffected(id)) {
       alignmentResult.value = null;
+      alignmentSeq1Id.value = '';
+      alignmentSeq2Id.value = '';
     }
-    if (gcData.value.length > 0) {
+    if (isGcAffected(id)) {
       gcData.value = [];
+      gcAnalyzedSeqId.value = '';
     }
-    if (phyloTree.value) {
+    if (isTreeAffected()) {
       phyloTree.value = null;
     }
   }
@@ -89,6 +104,9 @@ export const useSequenceStore = defineStore('sequence', () => {
     } else {
       alignmentResult.value = smithWaterman(s1.data, s2.data);
     }
+
+    alignmentSeq1Id.value = seq1Id;
+    alignmentSeq2Id.value = seq2Id;
   }
 
   function loadMockSequences() {
@@ -113,6 +131,7 @@ export const useSequenceStore = defineStore('sequence', () => {
     const seq = sequences.value.find(s => s.id === seqId);
     if (!seq) return;
     gcData.value = calculateGCContent(seq.data, windowSize);
+    gcAnalyzedSeqId.value = seqId;
   }
 
   return {
